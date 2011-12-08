@@ -1,0 +1,38 @@
+<h1>Lists of Things</h1>
+
+<section>
+  <h1>New List</h1>
+  <form method=post action=/lists>
+    <label>Name: <input type=text name=name /></label>
+    <input type=submit />
+    <input type=hidden name=<%= request_forgery_protection_token %> value=<%= form_authenticity_token %> />
+  </form>
+</section>
+
+<section>
+  <h1>New Thing</h1>
+  <form method=post action=/things>
+    <label>
+      List:
+      <select name=list>
+        <% @lists.each do |list| %>
+          <option><%= list %></option>
+        <% end %>
+      </select>
+    </label>
+    <label>Thing: <input type=text name=content /></label>
+    <input type=submit />
+    <input type=hidden name=<%= request_forgery_protection_token %> value=<%= form_authenticity_token %> />
+  </form>
+</section>
+
+<% @things.each do |k,v| %>
+  <article>
+    <h1><%= k %></h1>
+    <ul>
+      <% v.each do |a| %>
+        <li><%= a %>
+      <% end %>
+    </ul>
+  </article>
+<% end %>

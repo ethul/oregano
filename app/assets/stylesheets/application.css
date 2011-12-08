@@ -1,0 +1,12 @@
+/*
+ * This is a manifest file that'll automatically include all the stylesheets available in this directory
+ * and any sub-directories. You're free to add application-wide styles to this file and they'll appear at
+ * the top of the compiled file, but it's generally better to create a new file per style scope.
+ *= require normalize
+ *= require html5_boilerplate
+ *= require_self
+*/
+
+/* http://kuler.adobe.com/#themeID/1628456 */
+::-moz-selection {background: #1f212e; color: #fff386; text-shadow: none;}
+::selection {background: #1f212e; color: #fff386; text-shadow: none;}
