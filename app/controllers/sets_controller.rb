@@ -1,4 +1,4 @@
-class ListsController < ApplicationController
+class SetsController < ApplicationController
   def create
     validate_name.(params[:name]).
       bind(make_list).
@@ -9,14 +9,14 @@ class ListsController < ApplicationController
 
   def validate_name
     ->name {
-      if name.nil? or name.empty? then Left.new :bad_request
+      if name.nil? or name.empty? then Set.new :bad_request
       else Right.new name end
     }
   end
 
   def make_list
     ->name {
-      List.new(name).save.
+      Set.new(name).save.
       fold -> {Left.new :internal_server_error}, ->a {Right.new :created}
     }
   end

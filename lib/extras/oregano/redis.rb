@@ -1,4 +1,4 @@
-module Lot
+module Oregano
   module Redis
     @@host = "127.0.0.1"
     @@port = 6379

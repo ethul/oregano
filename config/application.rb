@@ -7,7 +7,7 @@ if defined?(Bundler)
   Bundler.require(*Rails.groups(:assets => %w(development test)))
 end
 
-module Lot
+module Oregano
   class Application < Rails::Application
     # Settings in config/environments/* take precedence over those specified here.
     # Application configuration should go into files in config/initializers

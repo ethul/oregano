@@ -1,6 +1,6 @@
-class ThingsController < ApplicationController
+class EntriesController < ApplicationController
   def create
-    Either.pure(make_thing).
+    Either.pure(make_entry).
       ap(validate.(params[:list])).
       ap(validate.(params[:content])).
       fold ->left {head left}, ->right {redirect_to :root}
@@ -8,9 +8,9 @@ class ThingsController < ApplicationController
 
   private
 
-  def make_thing
+  def make_entry
     ->list,content {
-      Thing.new(list,content).save.
+      Entry.new(list,content).save.
       fold -> {Left.new :internal_server_error}, ->a {Right.new :created}
     }
   end

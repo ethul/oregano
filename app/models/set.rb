@@ -1,4 +1,4 @@
-class List
+class Set
   attr_reader :name
 
   def initialize name
@@ -15,6 +15,6 @@ class List
   end
 
   private
-  REDIS = Lot::Redis.acquire
-  KEYSPACE = "lists"
+  REDIS = Oregano::Redis.acquire
+  KEYSPACE = "sets"
 end

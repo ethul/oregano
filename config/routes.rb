@@ -1,5 +1,6 @@
-Lot::Application.routes.draw do
-  resource :things, :only => :create
-  resource :lists, :only => :create
+Oregano::Application.routes.draw do
+  resource :entries, :only => :create
+  resource :sets, :only => :create
+  resource :users, :only => :create
   root :to => "root#index"
 end
