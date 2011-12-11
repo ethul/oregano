@@ -4,7 +4,7 @@ module Oregano
     @@port = 6379
     @@database = 10
     @@connection = ::Redis.new :host => @@host, :port => @@port, :db => @@database
-    def self.acquire
+    def acquire
       @@connection
     end
   end

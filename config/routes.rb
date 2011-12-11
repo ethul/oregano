@@ -1,6 +1,15 @@
 Oregano::Application.routes.draw do
-  resource :entries, :only => :create
-  resource :sets, :only => :create
-  resource :users, :only => :create
   root :to => "root#index"
+
+  resources :categories, :only => [:create,:show]
+  resources :items, :only => [:create,:show]
+
+  namespace :users do
+    resource :local, :only => :create
+  end
+
+  namespace :relations do
+    resources :user_categories, :only => :create
+    resources :category_items, :only => :create
+  end
 end

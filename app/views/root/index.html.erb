@@ -1,38 +1,24 @@
 <h1>Oregano</h1>
 
-<section>
-  <h1>New Set</h1>
-  <form method=post action=/sets>
-    <label>Name: <input type=text name=name /></label>
-    <input type=submit />
+<aside>
+  <form action=/users/local method=post>
+    <input type=submit value=login />
     <input type=hidden name=<%= request_forgery_protection_token %> value=<%= form_authenticity_token %> />
   </form>
-</section>
+</aside>
 
-<section>
-  <h1>New Entry</h1>
-  <form method=post action=/entries>
-    <label>
-      List:
-      <select name=set>
-        <% @sets.each do |set| %>
-          <option><%= set %></option>
-        <% end %>
-      </select>
-    </label>
-    <label>Entry: <input type=text name=content /></label>
-    <input type=submit />
+<aside>
+  <form id=user_categories>
+    <input type=submit value=go />
     <input type=hidden name=<%= request_forgery_protection_token %> value=<%= form_authenticity_token %> />
   </form>
-</section>
-
-<% @entries.each do |k,v| %>
-  <article>
-    <h1><%= k %></h1>
-    <ul>
-      <% v.each do |a| %>
-        <li><%= a %>
-      <% end %>
-    </ul>
-  </article>
-<% end %>
+  <script>
+    var form = $("#user_categories");
+    form.submit(function(e) {
+      $.post("/relations/user_categories",form.serialize()).done(function(a) {
+        console.log(a);
+      });
+      return false;
+    });
+  </script>
+</aside>
