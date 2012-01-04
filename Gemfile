@@ -21,4 +21,5 @@ gem "redis", "~> 2.2.0", :require => ["redis/connection/synchrony", "redis"]
 
 group :test, :development do
   gem "rspec-rails", "~> 2.6"
+  gem "spork", "~> 0.9.0.rc"
 end

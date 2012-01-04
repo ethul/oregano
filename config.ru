@@ -5,4 +5,4 @@ require ::File.expand_path('../config/environment',  __FILE__)
 # https://github.com/igrigorik/async-rails
 use Rack::FiberPool, :size => 100
 
-run Lot::Application
+run Oregano::Application
