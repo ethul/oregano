@@ -1,0 +1,17 @@
+# humanstxt.org
+
+# TEAM
+
+    eric - developer
+
+# THANKS
+
+
+# TECHNOLOGY COLOPHON
+
+    HTML5, CSS3
+    jQuery, Modernizr, HTML5 Boilerplate
+    Bacon.js - https://github.com/raimohanska/bacon.js
+    Font Awesome - http://fortawesome.github.com/Font-Awesome
+    Qumpellka No12 - http://www.fontsquirrel.com/fonts/qumpellkano12
+    Veggie Medley - http://kuler.adobe.com/#themeID/1941670

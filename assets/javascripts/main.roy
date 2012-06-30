@@ -1,0 +1,77 @@
+data Event a = NewUrl a
+
+let unit = {}
+let iife f = f ()
+let bus = (new Bacon).Bus ()
+let headerTemplate = "body > header"
+let newUrlTemplate = "#new-url"
+let newUrlInput = "#new-url-input"
+let newUrlTemplateForm = newUrlTemplate ++ " form"
+let urlsTemplate = "#urls"
+
+let deferredMonad = {
+  return: \a -> $.when a
+  bind: \m f ->
+    let defer = $.Deferred ()
+    m.done (\a -> (f a).done defer.resolve)
+    defer.promise ()
+}
+
+let renderHeader () =
+  ($ document).ready (\() ->
+    let el = $ headerTemplate
+    el.hide ()
+    el.html(Handlebars.templates.header ())
+    el.fadeIn ()
+  )
+
+let renderNewUrl () =
+  ($ document).ready (\() ->
+    let el = $ newUrlTemplate
+    el.hide ()
+    el.html (Handlebars.templates.new_url ())
+    el.fadeIn ()
+
+    let input = $ newUrlInput
+    input.focus ()
+
+    let form = $ newUrlTemplateForm
+    let submits = form.asEventStream "submit"
+    bus.plug (submits.map (\e ->
+      e.preventDefault ()
+      NewUrl (form.serializeObject ())
+    ))
+  )
+
+let renderUrls urls =
+  ($ document).ready (\() ->
+    let el = $ urlsTemplate
+    el.hide ()
+    el.html (Handlebars.templates.urls urls)
+    el.fadeIn ()
+  )
+
+let renderUrl url =
+  ($ document).ready (\() ->
+    let template = $ urlsTemplate
+    let el = $ (Handlebars.templates.url url)
+    el.hide ()
+    template.append el
+    el.fadeIn ()
+  )
+
+
+bus.onValue (\e -> match e
+  case (NewUrl a) = iife (\() ->
+    (($ newUrlTemplateForm) @ 0).reset ()
+    $.post "/urls" a
+    renderUrl a.url
+  )
+)
+
+renderHeader ()
+renderNewUrl ()
+
+do deferredMonad
+  urls <- $.get "/urls"
+  return renderUrls urls
