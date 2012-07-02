@@ -1,4 +1,11 @@
-<article class=url>
-  <h1>{{this}}</h1>
-  <a href="{{this}}">View</a>
+<article id=url-{{id}} class="{{classNames}}">
+  <h1>{{url}}</h1>
+  <div class=controls>
+    <a href="#urls/{{id}}/view" class=view>
+      <i class=icon-external-link></i>
+    </a>
+    <a href="#urls/{{id}}/pinch" class=pinch>
+      <i class=icon-leaf></i>
+    </a>
+  </div>
 </article>

@@ -46,8 +46,25 @@ header {
   box-shadow: 0 0 0.5em $dark-color;
 }
 
-.url h1 {
-  margin-bottom: 0;
+.url {
+  h1 {margin-bottom: 0;}
+  a {text-decoration: none;}
+  .controls {
+    a {padding-right: 0.5em;}
+    a:last-child {padding-right: 0;}
+  }
+}
+
+.url.views {
+  h1, a.view, a.view:visited, a.view:hover {
+    color: rgba(0,0,0,.25);
+  }
+}
+
+.url.pinches {
+  a.pinch, a.pinch:visited, a.pinch:hover {
+    color: $header-color;
+  }
 }
 
 // Squeezed layout

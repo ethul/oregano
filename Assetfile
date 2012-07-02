@@ -16,8 +16,8 @@ module Rake::Pipeline::Web::Filters
   end
 end
 
-input "app" do
-  output "app"
+input "lib" do
+  output "lib"
   match "*.roy" do
     roy(nodejs: true)
   end
@@ -33,6 +33,16 @@ input "assets" do
     concat "javascripts/templates.js"
   end
 
+  match "templates/*.erb" do
+    context = Class.new do
+      def version
+        Time.now.to_i
+      end
+    end.new
+    tilt({}, context) do |input|
+      input.sub("templates/", "").sub(".erb", "")
+    end
+  end
 
   match "javascripts/*.roy" do
     roy

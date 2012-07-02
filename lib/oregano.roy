@@ -1,0 +1,188 @@
+let crypto = require "crypto"
+let deferred = require "JQDeferred"
+let underscore = require "underscore"
+
+let unit = {}
+
+data DBType a = DB a
+
+let dbMonad = {
+  return: \a -> \c -> DB a
+  bind: \ma f -> \c -> match ma
+    case (DB a) = (f a) c
+}
+
+let runDB ma c =
+  let res = ma c
+  match res
+    case (DB a) = a
+
+let deferredMonad = {
+  return: \a ->
+    deferred.when a
+  bind: \ma f ->
+    let defer = deferred ()
+    ma.done (\a ->
+      let mb = f a
+      mb.done defer.resolve
+      mb.fail defer.reject
+    )
+    ma.fail defer.reject
+    defer.promise ()
+}
+
+let dbDeferredMonad = {
+  return: \a -> dbMonad.return (deferredMonad.return a)
+  bind: \m f -> \c ->
+    let x = m c
+    DB (match x
+      case (DB ma) = (do deferredMonad
+        a <- ma
+        let y = (f a) c
+        match y
+          case (DB mb) = mb
+      )
+    )
+}
+
+let liftDb f = \db ->
+  DB (f db)
+
+let liftDeferred f =
+  let defer = deferred ()
+  f defer
+  defer.promise ()
+
+let liftDbDeferred f = liftDb (\db ->
+  liftDeferred (\defer ->
+    f db defer
+  )
+)
+
+let sequenceDeferred mas = liftDeferred (\defer ->
+  let master = deferred.when.apply deferred mas
+  master.done (\_ ->
+    defer.resolve (Array.prototype.slice.call arguments)
+  )
+  master.fail defer.reject
+)
+
+let liftDbOp op = liftDbDeferred (\db defer ->
+  (op db) (\error res ->
+    if error then
+      defer.reject error
+    else
+      defer.resolve res
+  )
+)
+
+let createRel rel = (\from to ->
+  liftDbOp (\_ ->
+    (\handler ->
+      from.createRelationshipTo to rel {} handler
+    )
+  )
+)
+
+let getRel rel = (\key node ->
+ let query = "START a=node:users(key={key}),b=node({id}) MATCH a-[r:"++rel++"]->b RETURN r"
+ do dbDeferredMonad
+   res <- liftDbOp (\db -> (\handler ->
+            db.query query {key: key, id: node.id} handler
+          ))
+   return res.map (\a -> a.r)
+)
+
+
+let getAllAddsRel key = (do dbDeferredMonad
+  let query = "START a=node:users(key={key}) MATCH a-[r:adds]->b RETURN b"
+  res <- liftDbOp (\db ->
+          (\handler -> db.query query {key: key} handler)
+         )
+  return res.map (\a -> a.b)
+)
+
+let getRelForNodes rel nodes key = liftDb (\db ->
+  sequenceDeferred (nodes.map (\a ->
+    runDB (rel key a) db
+  ))
+)
+
+let getUser key = liftDbDeferred (\db defer ->
+  let query = "START a=node:users(key={key}) RETURN a"
+  db.query query {key: key} (\error res ->
+    if error || res.length == 0 then
+      defer.reject error
+    else
+      defer.resolve (res.shift ()).a
+  )
+)
+
+let getNode id = liftDbOp (\db -> (\handler ->
+  db.getNodeById id handler
+))
+
+let saveNode node = liftDbOp (\_ -> (\handler ->
+  node.save handler
+))
+
+let createPinchesRel = createRel "pinches"
+let createAddsRel = createRel "adds"
+let createViewsRel = createRel "views"
+let getViewsRel = getRel "views"
+let getPinchesRel = getRel "pinches"
+
+let createUrl url key = (do dbDeferredMonad
+  user <- getUser key
+  node <- liftDb (\db ->
+            deferredMonad.return (db.createNode {url: url})
+          )
+  _    <- saveNode node
+  rel  <- createAddsRel user node
+  return {
+    id: node.id
+    url: node.data.url
+  }
+)
+
+let indexUrls key = (do dbDeferredMonad
+  adds    <- getAllAddsRel key
+  views   <- getRelForNodes getViewsRel adds key
+  pinches <- getRelForNodes getPinchesRel adds key
+  let zipped = underscore.zip adds views pinches
+  return zipped.map (\tuple -> {
+    id: (tuple @ 0).id
+    url: (tuple @ 0).data.url
+    relTypes: ((tuple.slice 1).reduce (\b a ->
+      b.concat a
+    )).map(\a -> a.type)
+  })
+)
+
+let createUrlView id key = (do dbDeferredMonad
+  user  <- getUser key
+  node  <- getNode id
+  views <- getViewsRel key node
+  res   <- if views.length == 0 then
+             createViewsRel user node
+           else
+             dbDeferredMonad.return unit
+  return res
+)
+
+let createUrlPinch id key = (do dbDeferredMonad
+  user    <- getUser key
+  node    <- getNode id
+  pinches <- getPinchesRel key node
+  res     <- if pinches.length == 0 then
+               createPinchesRel user node
+             else
+               dbDeferredMonad.return unit
+  return res
+)
+
+export runDB
+export createUrl
+export indexUrls
+export createUrlView
+export createUrlPinch
