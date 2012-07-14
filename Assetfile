@@ -1,0 +1,123 @@
+require "rake-pipeline-web-filters"
+
+module Rake::Pipeline::Web::Filters
+  class HandlebarsPrecompileFilter < Rake::Pipeline::Filter
+    attr_reader :options
+    def initialize(options = {}, &block)
+      super &(block || ->input {input.sub(/\.(handlebars|hbs)\z/, ".js")})
+      @handlebars = options.delete(:handlebars) || "handlebars"
+    end
+    protected
+    def generate_output(inputs, output)
+      inputs.each do |input|
+        output.write %x(#{@handlebars} #{input.fullpath})
+      end
+    end
+  end
+end
+
+input "lib" do
+  output "lib"
+  match "*.roy" do
+    roy(nodejs: true)
+  end
+end
+
+input "assets" do
+  output "public"
+
+  match "templates/*.handlebars" do
+    filter(Rake::Pipeline::Web::Filters::HandlebarsPrecompileFilter, {
+      handlebars: "node_modules/handlebars/bin/handlebars"
+    })
+    concat "javascripts/templates.js"
+  end
+
+  match "templates/*.erb" do
+    context = Class.new do
+      def version
+        Time.now.to_i
+      end
+    end.new
+    tilt({}, context) do |input|
+      input.sub("templates/", "").sub(".erb", "")
+    end
+  end
+
+  match "javascripts/*.roy" do
+    roy
+  end
+
+  match "javascripts/*.js" do
+    concat ["javascripts/templates.js"], "javascripts/main.js"
+    if ENV["RAKEP_MINIFY"]
+      uglify do |input|
+        input.sub("min.", "")
+      end
+    end
+  end
+
+  match "stylesheets/*.scss" do
+    scss
+    if ENV["RAKEP_MINIFY"]
+      yui_css do |input|
+        input.sub("min.", "")
+      end
+    end
+  end
+
+  match "vendor/modernizr*.js" do
+    if ENV["RAKEP_MINIFY"]
+      uglify do |input|
+        input.sub(%r{vendor/.*\.js}, "javascripts/modernizr.js")
+      end
+    else
+      copy do |input|
+        input.sub(%r{vendor/.*\.js}, "javascripts/modernizr.js")
+      end
+    end
+  end
+
+  match "vendor/{#{%w(
+    jquery-1.7.2
+    handlebars.runtime-1.0.0.beta.6
+    Bacon
+    jquery.ba-serializeobject
+  ).join(",")}}.js" do
+    concat ["vendor/jquery-1.7.2.js"], "javascripts/vendor.js"
+    if ENV["RAKEP_MINIFY"]
+      uglify do |input|
+        input.sub("min.", "")
+      end
+    end
+  end
+
+  match "vendor/{#{%w(
+    html5bp-3.0
+    font-awesome-2.0.0-25
+    font-awesome-ie7-2.0.0-25
+    QumpellkaNo12-webfont
+  ).join(",")}}.css" do
+    concat [
+      "vendor/html5bp-3.0.css",
+      "vendor/font-awesome-2.0.0-25.css"
+    ], "stylesheets/vendor.css"
+    if ENV["RAKEP_MINIFY"]
+      yui_css do |input|
+        input.sub("min.", "")
+      end
+    end
+  end
+
+  match "vendor/font/*.{eot,svg,ttf,woff}" do
+    copy do |input|
+      input.sub("vendor","")
+    end
+  end
+
+  match "statics/*.*" do
+    copy do |input|
+      input.sub "statics/", ""
+    end
+  end
+end

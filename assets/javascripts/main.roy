@@ -1,0 +1,105 @@
+data Event a = NewUrl a | NewPinch a | NewView a
+
+let unit = {}
+let iife f = f ()
+let bus = (new Bacon).Bus ()
+let headerTemplate = "body > header"
+let newUrlTemplate = "#new-url"
+let newUrlInput = "#new-url-input"
+let newUrlTemplateForm = newUrlTemplate ++ " form"
+let urlsTemplate = "#urls"
+let newViewLink id = "a[href=\"#urls/" ++ id ++ "/view\"]"
+let newPinchLink id = "a[href=\"#urls/" ++ id ++ "/pinch\"]"
+
+let deferredMonad = {
+  return: \a -> $.when a
+  bind: \m f ->
+    let defer = $.Deferred ()
+    m.done (\a -> (f a).done defer.resolve)
+    defer.promise ()
+}
+
+let userKey () =
+  document.location.hash.substr 1
+
+let renderHeader () =
+  ($ document).ready (\() ->
+    let el = $ headerTemplate
+    el.html(Handlebars.templates.header ())
+  )
+
+let renderNewUrl () =
+  ($ document).ready (\() ->
+    let el = $ newUrlTemplate
+    el.html (Handlebars.templates.new_url ())
+
+    let input = $ newUrlInput
+    input.focus ()
+
+    let form = $ newUrlTemplateForm
+    let submits = form.asEventStream "submit"
+    bus.plug (submits.map (\e ->
+      e.preventDefault ()
+      NewUrl (form.serializeObject ())
+    ))
+  )
+
+let renderUrls urls =
+  ($ document).ready (\() ->
+    let template = $ urlsTemplate
+    urls.map renderUrl
+  )
+
+let renderUrl url =
+  ($ document).ready (\() ->
+    let template = $ urlsTemplate
+    let el = $ (Handlebars.templates.url url)
+    el.hide ()
+    template.prepend el
+    el.fadeIn ()
+
+    let view = $ (newViewLink url.id)
+    let viewClicks = view.asEventStream "click"
+    bus.plug (viewClicks.map (\e ->
+      e.preventDefault ()
+      NewView url
+    ))
+
+    let pinch = $ (newPinchLink url.id)
+    let pinchClicks = pinch.asEventStream "click"
+    bus.plug (pinchClicks.map (\e ->
+      e.preventDefault ()
+      NewPinch url
+    ))
+  )
+
+
+bus.onValue (\e -> match e
+  case (NewUrl a) = iife (\() ->
+    (($ newUrlTemplateForm) @ 0).reset ()
+    do deferredMonad 
+      url <- $.post "/urls" a with {key: userKey ()}
+      _   <- deferredMonad.return (renderUrl url)
+      return ($ "#url-" ++ url.id).addClass "url"
+  )
+  case (NewView a) = iife (\() ->
+    let url = "/urls/" ++ a.id ++ "/view"
+    $.post url a with {key: userKey ()}
+    ($ "#url-" ++ a.id).addClass "views"
+    window.open a.url
+  )
+  case (NewPinch a) = iife (\() ->
+    let url = "/urls/" ++ a.id ++ "/pinch"
+    $.post url a with {key: userKey ()}
+    ($ "#url-" ++ a.id).addClass "pinches"
+  )
+)
+
+renderHeader ()
+renderNewUrl ()
+
+do deferredMonad
+  urls <- $.get "/urls" {key: userKey ()}
+  return renderUrls (urls.map (\a -> a with {
+    classNames: (a.relTypes.concat ["url"]).join " "
+  }))
