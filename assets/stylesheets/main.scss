@@ -1,0 +1,159 @@
+@import "../vendor/frameless";
+
+$base-color: #fee1a2;
+$header-color: #b5ae5b;
+$dark-color: #6e3631;
+$bright-color: #f24f47;
+$neutral-color: #ffbe5c;
+
+$header-font: "QumpellkaNo12Regular", Arial, sans-serif;
+
+html {
+  background-color: $base-color;
+}
+
+header {
+  text-align: center;
+
+  h1 {
+    color: $header-color;
+    font-family: $header-font;
+    letter-spacing: 0.038em;
+    text-shadow: 0.5px 0.5px 1px $bright-color,
+                 1px 1px 1px $bright-color,
+                 1.5px 1.5px 1px $bright-color,
+                 1.5px 1.5px 1px $dark-color,
+                 2px 2px 3px $dark-color;
+  }
+
+  h2 {
+    color: $bright-color;
+    text-shadow: 1px 1px 1px $dark-color;
+  }
+}
+
+#new-url-input {
+  height: 2rem;
+  background: white;
+  border-radius: 10em;
+  border: 0;
+  outline: none;
+  color: black;
+  z-index: 1;
+}
+
+#new-url-input:focus {
+  box-shadow: 0 0 0.5em $dark-color;
+}
+
+.url {
+  h1 {margin-bottom: 0;}
+  a {text-decoration: none;}
+  .controls {
+    a {padding-right: 0.5em;}
+    a:last-child {padding-right: 0;}
+  }
+}
+
+.url.views {
+  h1, a.view, a.view:visited, a.view:hover {
+    color: rgba(0,0,0,.25);
+  }
+}
+
+.url.pinches {
+  a.pinch, a.pinch:visited, a.pinch:hover {
+    color: $header-color;
+  }
+}
+
+// Squeezed layout
+@media screen and (min-width: 0em) and (max-width: 15em) {
+  $body-width: 100%;
+  $input-padding: 5%;
+
+  header {
+    h1 {font-size: 2em;}
+    h2 {font-size: 1em;}
+  }
+  body {
+    margin: 0;
+    width: 100%;
+  }
+  #urls {
+    font-size: 0.75em;
+  }
+  #new-url-input {
+    padding: 0 $input-padding;
+    width: $body-width - $input-padding* 2;
+  }
+}
+
+// Mobile narrow layout 240px
+@media screen and (min-width: 15em) {
+  $body-width: 100%;
+  $input-padding: 5%;
+
+  header {
+    h1 {font-size: 3em;}
+  }
+  body {
+    margin: 0;
+    width: $body-width;
+  }
+  #new-url-input {
+    padding: 0 $input-padding;
+    width: $body-width - $input-padding* 2;
+  }
+}
+
+// Mobile wide layout 480px
+@media screen and (min-width: 30em) {
+  $body-width: $cols6 + $cols1 * 0.95;
+  $input-padding: 1em;
+
+  header {
+    h1 {font-size: 4.25em;}
+  }
+  body {
+    width: $body-width;
+    margin: 0 auto;
+  }
+  #new-url-input {
+    padding: 0 $input-padding;
+    width: $body-width - $input-padding * 2;
+  }
+}
+
+// Tablet layout 600px
+@media screen and (min-width: 37.5em) {
+  $body-width: $cols8 + $cols1 * 0.65;
+  $input-padding: 1em;
+
+  header {
+    h1 {font-size: 5.5em;}
+    h2 {font-size: 2em;}
+  }
+  body {
+    width: $body-width;
+  }
+  #new-url-input {
+    width: $body-width - $input-padding * 2;
+  }
+}
+
+// Wide layout 912px
+@media screen and (min-width: 57em) {
+  $body-width: $cols10;
+  $input-padding: 1em;
+
+  header {
+    h1 {font-size: 6.5em;}
+  }
+  body {
+    width: $body-width;
+  }
+  #new-url-input {
+    width: $body-width - $input-padding * 2;
+  }
+}
