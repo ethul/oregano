@@ -6,7 +6,7 @@
     "start": "node server"
   },
   "dependencies": {
-    "express": ">= 3.0.0beta2",
+    "express": "3.0.0beta2",
     "gzippo": ">= 0.1.4",
     "handlebars": ">= 1.0.5beta",
     "neo4j": ">= 0.2.13",
