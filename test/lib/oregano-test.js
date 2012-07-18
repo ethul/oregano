@@ -142,40 +142,22 @@ describe("Oregano", function(){
   describe("#indexUrls", function(){
     describe("when the urls are fetched successfully", function(){
       beforeEach(function(){
-        this.adds = [
-          node({id: 1, url: "a", type: "adds"}),
-          node({id: 2, url: "a", type: "adds"}),
-          node({id: 3, url: "a", type: "adds"}),
-        ];
-        this.views = [
-          [],
-          [node({id: 4, type: "views"})],
-          [node({id: 5, type: "views"})],
-        ];
-        this.pinches = [
-          [node({id: 6, type: "pinches"})],
-          [],
-          [node({id: 7, type: "pinches"})],
+        this.nodes = [
+          node({id: 1, url: "a", relTypes: ["adds","pinches"]}),
+          node({id: 2, url: "a", relTypes: ["adds","views"]}),
+          node({id: 3, url: "a", relTypes: ["adds","views","pinches"]}),
         ];
       });
       beforeEach(function(){
         var that = this;
         sinon.stub(this.db, "query", function(query, _, f){
-          if (query.match(/r:adds/)) {
-            return f(undefined, that.adds.map(function(a){
-              return {b: a};
-            }));
-          }
-          else if (query.match(/r:views/)) {
-            return f(undefined, that.views.shift().map(function(a){
-              return {r: a};
-            }));
-          }
-          else if (query.match(/r:pinches/)) {
-            return f(undefined, that.pinches.shift().map(function(a){
-              return {r: a};
-            }));
-          }
+          return f(undefined, that.nodes.map(function(a){
+            return {
+              id: a.id,
+              url: a.data.url,
+              relTypes: a.data.relTypes
+            };
+          }));
         });
       });
       beforeEach(function(){
@@ -185,22 +167,22 @@ describe("Oregano", function(){
         );
       });
       it("should return the adds rels", k(function(res){
-        expect(res.length).to.equal(this.adds.length);
+        expect(res.length).to.equal(this.nodes.length);
       }));
       it("should have an id", k(function(res){
         res.forEach(function(a, i){
-          expect(res[i].id).to.equal(this.adds[i].id);
+          expect(res[i].id).to.equal(this.nodes[i].id);
         }, this);
       }));
       it("should have a url", k(function(res){
         res.forEach(function(a, i){
-          expect(res[i].url).to.equal(this.adds[i].data.url);
+          expect(res[i].url).to.equal(this.nodes[i].data.url);
         }, this);
       }));
       it("should have rel types", k(function(res){
-        expect(res[0].relTypes).to.eql(["pinches"]);
-        expect(res[1].relTypes).to.eql(["views"]);
-        expect(res[2].relTypes).to.eql(["views", "pinches"]);
+        expect(res[0].relTypes).to.eql(["adds","pinches"]);
+        expect(res[1].relTypes).to.eql(["adds","views"]);
+        expect(res[2].relTypes).to.eql(["adds","views", "pinches"]);
       }));
     });
 

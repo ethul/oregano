@@ -59,14 +59,6 @@ let liftDbDeferred f = liftDb (\db ->
   )
 )
 
-let sequenceDeferred mas = liftDeferred (\defer ->
-  let master = deferred.when.apply deferred mas
-  master.done (\_ ->
-    defer.resolve (Array.prototype.slice.call arguments)
-  )
-  master.fail defer.reject
-)
-
 let liftDbOp op = liftDbDeferred (\db defer ->
   (op db) (\error res ->
     if error then
@@ -93,19 +85,12 @@ let getRel rel = (\key node ->
    return res.map (\a -> a.r)
 )
 
-
-let getAllAddsRel key = (do dbDeferredMonad
-  let query = "START a=node:users(key={key}) MATCH a-[r:adds]->b RETURN b"
+let getAllRel key = (do dbDeferredMonad
+  let query = "START a=node:users(key={key}) MATCH a-[r:adds|views|pinches]->b RETURN id(b) AS id, b.url AS url, collect(type(r)) AS relTypes ORDER BY id(b)"
   res <- liftDbOp (\db ->
           (\handler -> db.query query {key: key} handler)
          )
-  return res.map (\a -> a.b)
-)
-
-let getRelForNodes rel nodes key = liftDb (\db ->
-  sequenceDeferred (nodes.map (\a ->
-    runDB (rel key a) db
-  ))
+  return res
 )
 
 let getUser key = liftDbDeferred (\db defer ->
@@ -146,17 +131,8 @@ let createUrl url key = (do dbDeferredMonad
 )
 
 let indexUrls key = (do dbDeferredMonad
-  adds    <- getAllAddsRel key
-  views   <- getRelForNodes getViewsRel adds key
-  pinches <- getRelForNodes getPinchesRel adds key
-  let zipped = underscore.zip adds views pinches
-  return zipped.map (\tuple -> {
-    id: (tuple @ 0).id
-    url: (tuple @ 0).data.url
-    relTypes: ((tuple.slice 1).reduce (\b a ->
-      b.concat a
-    )).map(\a -> a.type)
-  })
+  res <- getAllRel key
+  return res
 )
 
 let createUrlView id key = (do dbDeferredMonad
