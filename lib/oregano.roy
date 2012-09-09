@@ -1,21 +1,26 @@
 let crypto = require "crypto"
 let deferred = require "JQDeferred"
 let underscore = require "underscore"
+let htmlparser = require "htmlparser"
+
+data ReaderType a = Reader a
+data DBType a = DB a
+data RequestType a = Request a
+
+type Env = {db: DB #a, request: Request #a}
 
 let unit = {}
 
-data DBType a = DB a
-
-let dbMonad = {
-  return: \a -> \c -> DB a
+let readerMonad = {
+  return: \a -> \c -> Reader a
   bind: \ma f -> \c -> match ma
-    case (DB a) = (f a) c
+    case (Reader a) = (f a) c
 }
 
-let runDB ma c =
+let runReader ma c =
   let res = ma c
   match res
-    case (DB a) = a
+    case (Reader a) = a
 
 let deferredMonad = {
   return: \a ->
@@ -31,36 +36,36 @@ let deferredMonad = {
     defer.promise ()
 }
 
-let dbDeferredMonad = {
-  return: \a -> dbMonad.return (deferredMonad.return a)
+let readerDeferredMonad = {
+  return: \a -> readerMonad.return (deferredMonad.return a)
   bind: \m f -> \c ->
     let x = m c
-    DB (match x
-      case (DB ma) = (do deferredMonad
+    Reader (match x
+      case (Reader ma) = (do deferredMonad
         a <- ma
         let y = (f a) c
         match y
-          case (DB mb) = mb
+          case (Reader mb) = mb
       )
     )
 }
 
-let liftDb f = \db ->
-  DB (f db)
+let liftReader f = \env ->
+  Reader (f env)
 
 let liftDeferred f =
   let defer = deferred ()
   f defer
   defer.promise ()
 
-let liftDbDeferred f = liftDb (\db ->
+let liftReaderDeferred f = liftReader (\env ->
   liftDeferred (\defer ->
-    f db defer
+    f env defer
   )
 )
 
-let liftDbOp op = liftDbDeferred (\db defer ->
-  (op db) (\error res ->
+let liftDbOp op = liftReaderDeferred (\env defer ->
+  (op env.db) (\error res ->
     if error then
       defer.reject error
     else
@@ -78,24 +83,24 @@ let createRel rel = (\from to ->
 
 let getRel rel = (\key node ->
  let query = "START a=node:users(key={key}),b=node({id}) MATCH a-[r:"++rel++"]->b RETURN r"
- do dbDeferredMonad
+ do readerDeferredMonad
    res <- liftDbOp (\db -> (\handler ->
             db.query query {key: key, id: node.id} handler
           ))
    return res.map (\a -> a.r)
 )
 
-let getAllRel key = (do dbDeferredMonad
-  let query = "START a=node:users(key={key}) MATCH a-[r:adds|views|pinches]->b RETURN id(b) AS id, b.url AS url, collect(type(r)) AS relTypes ORDER BY id(b)"
+let getAllRel key = (do readerDeferredMonad
+  let query = "START a=node:users(key={key}) MATCH a-[r:adds|views|pinches]->b RETURN id(b) AS id, b.url AS url, b.title? AS title, collect(type(r)) AS relTypes ORDER BY id(b)"
   res <- liftDbOp (\db ->
           (\handler -> db.query query {key: key} handler)
          )
   return res
 )
 
-let getUser key = liftDbDeferred (\db defer ->
+let getUser key = liftReaderDeferred (\env defer ->
   let query = "START a=node:users(key={key}) RETURN a"
-  db.query query {key: key} (\error res ->
+  env.db.query query {key: key} (\error res ->
     if error || res.length == 0 then
       defer.reject error
     else
@@ -111,53 +116,86 @@ let saveNode node = liftDbOp (\_ -> (\handler ->
   node.save handler
 ))
 
+let fetchHtml url = liftReaderDeferred (\env defer ->
+  env.request url (\error res body ->
+    if !(error) && res.statusCode == 200 then
+      defer.resolve body
+    else
+      defer.reject error
+  )
+)
+
+let parseHtml html = liftReaderDeferred (\_ defer ->
+  let handler = (new htmlparser.DefaultHandler) (\error dom ->
+    if error then
+      defer.reject error
+    else
+      defer.resolve dom
+  ) {verbose: false, ignoreWhitespace: true}
+  ((new htmlparser.Parser) (handler)).parseComplete html
+)
+
+let extractTitle dom =
+  (getText (getTitle dom)).reduce (\b a -> b ++ a.data) ""
+where
+  getTitle els = htmlparser.DomUtils.getElementsByTagName "title" els
+  getText els = htmlparser.DomUtils.getElementsByTagType "text" els
+
 let createPinchesRel = createRel "pinches"
 let createAddsRel = createRel "adds"
 let createViewsRel = createRel "views"
 let getViewsRel = getRel "views"
 let getPinchesRel = getRel "pinches"
 
-let createUrl url key = (do dbDeferredMonad
-  user <- getUser key
-  node <- liftDb (\db ->
-            deferredMonad.return (db.createNode {url: url})
-          )
-  _    <- saveNode node
-  rel  <- createAddsRel user node
+let createUrl url key = (do readerDeferredMonad
+  user  <- getUser key
+  title <- do readerDeferredMonad
+             html <- fetchHtml url
+             dom  <- parseHtml html
+             return extractTitle dom
+  node  <- liftReader (\env ->
+             deferredMonad.return (env.db.createNode {
+               url: url
+               title: title
+             })
+           )
+  _     <- saveNode node
+  rel   <- createAddsRel user node
   return {
     id: node.id
     url: node.data.url
+    title: node.data.title
   }
 )
 
-let indexUrls key = (do dbDeferredMonad
+let indexUrls key = (do readerDeferredMonad
   res <- getAllRel key
   return res
 )
 
-let createUrlView id key = (do dbDeferredMonad
+let createUrlView id key = (do readerDeferredMonad
   user  <- getUser key
   node  <- getNode id
   views <- getViewsRel key node
   res   <- if views.length == 0 then
              createViewsRel user node
            else
-             dbDeferredMonad.return unit
+             readerDeferredMonad.return unit
   return res
 )
 
-let createUrlPinch id key = (do dbDeferredMonad
+let createUrlPinch id key = (do readerDeferredMonad
   user    <- getUser key
   node    <- getNode id
   pinches <- getPinchesRel key node
   res     <- if pinches.length == 0 then
                createPinchesRel user node
              else
-               dbDeferredMonad.return unit
+               readerDeferredMonad.return unit
   return res
 )
 
-export runDB
+export runReader
 export createUrl
 export indexUrls
 export createUrlView
