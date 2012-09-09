@@ -2,10 +2,11 @@ var express = require("express")
   , gzippo = require("gzippo")
   , oregano = require("./lib/oregano")
   , neo4j = require("neo4j")
+  , request = require("request")
   , app = express()
   , neo4jLocal = "http://localhost:7474"
   , neo4jProd = process.env.NEO4J_URL
-  , db = undefined;
+  , env = {db: undefined, request: request};
 
 app.use(express.bodyParser());
 app.use(express.methodOverride());
@@ -15,7 +16,7 @@ app.use(express.favicon());
 app.configure("development", function(){
   app.use(express.errorHandler());
   app.use(express.static(__dirname + "/public"));
-  db = new neo4j.GraphDatabase(neo4jLocal);
+  env.db = new neo4j.GraphDatabase(neo4jLocal);
 });
 
 app.configure("production", function(){
@@ -24,29 +25,29 @@ app.configure("production", function(){
     maxAge: fiveYears,
     clientMaxAge: fiveYears 
   }));
-  db = new neo4j.GraphDatabase(neo4jProd);
+  env.db = new neo4j.GraphDatabase(neo4jProd);
 });
 
 app.post("/urls/:id/view", function(req, res){
-  oregano.runDB(oregano.createUrlView(req.body.id, req.body.key), db).
+  oregano.runReader(oregano.createUrlView(req.body.id, req.body.key), env).
     done(function(){res.send(201);}).
     fail(function(e){console.error(e); res.send(400);});
 });
 
 app.post("/urls/:id/pinch", function(req, res){
-  oregano.runDB(oregano.createUrlPinch(req.body.id, req.body.key), db).
+  oregano.runReader(oregano.createUrlPinch(req.body.id, req.body.key), env).
     done(function(){res.send(201);}).
     fail(function(e){console.error(e); res.send(400);});
 });
 
 app.post("/urls", function(req, res){
-  oregano.runDB(oregano.createUrl(req.body.url, req.body.key), db).
+  oregano.runReader(oregano.createUrl(req.body.url, req.body.key), env).
     done(function(url){res.json(201, url);}).
     fail(function(e){console.error(e); res.send(400);});
 });
 
 app.get("/urls", function(req, res){
-  oregano.runDB(oregano.indexUrls(req.param("key")), db).
+  oregano.runReader(oregano.indexUrls(req.param("key")), env).
     done(function(urls){res.json(200, urls);}).
     fail(function(e){console.error(e); res.send(400);});
 });
@@ -60,9 +61,9 @@ app.get("/", function(req, res){
   res.sendfile(__dirname + "/public/index.html");
 });
 
-var port = process.env.PORT || 5000
-  , env = process.env.NODE_ENV || "development";
+var nodePort = process.env.PORT || 5000
+  , nodeEnv = process.env.NODE_ENV || "development";
 
-app.listen(port);
+app.listen(nodePort);
 
-console.log("Express server listening on port " + port + " in " + env);
+console.log("Express server listening on port " + nodePort + " in " + nodeEnv);
