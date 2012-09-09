@@ -46,10 +46,7 @@ let renderNewUrl () =
 
 let renderUrls urls =
   ($ document).ready (\() ->
-    let template = $ urlsTemplate
-    template.hide ()
     urls.map renderUrl
-    template.fadeIn ()
   )
 
 let renderUrl url =

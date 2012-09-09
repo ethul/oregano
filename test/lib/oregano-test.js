@@ -2,16 +2,14 @@ var expect = require("chai").expect
   , sinon = require("sinon")
   , oregano = require("../../lib/oregano.js");
 
-var node  = {
-  createRelationshipTo: function(_, _, _, f){
-    return f();
-  }
-};
-
 var db = {
   query: function(_, _, f){return f();},
   createNode: function(data){return node(data);},
   getNodeById: function(_, f){return f();},
+};
+
+var request = function(url, f){
+  // f takes (error, response, body)
 };
 
 var node = function(data){
@@ -37,15 +35,15 @@ var k = function(f){
 describe("Oregano", function(){
   beforeEach(function(){
     this.subject = oregano;
-    this.db = db;
+    this.env = {db: db, request: request};
   });
   afterEach(function(){
-    if (this.db.query.restore)
-      this.db.query.restore();
-    if (this.db.createNode.restore)
-      this.db.createNode.restore();
-    if (this.db.getNodeById.restore)
-      this.db.getNodeById.restore();
+    if (this.env.db.query.restore)
+      this.env.db.query.restore();
+    if (this.env.db.createNode.restore)
+      this.env.db.createNode.restore();
+    if (this.env.db.getNodeById.restore)
+      this.env.db.getNodeById.restore();
   });
 
   describe("#createUrl", function(){
@@ -56,39 +54,116 @@ describe("Oregano", function(){
     describe("when the url is created successfully", function(){
       beforeEach(function(){
         var that = this;
-        this.stubQuery = sinon.stub(this.db, "query", function(_, _, f){
+        this.stubQuery = sinon.stub(this.env.db, "query", function(_, _, f){
           return f(undefined, [{a: node({id: that.id})}]);
         });
       });
-      beforeEach(function(){
-        this.res = this.subject.runDB(
-          this.subject.createUrl(this.url, this.key),
-          this.db
-        );
+      describe("when the url's page title is fetched successfully", function(){
+        beforeEach(function(){
+          this.error = false;
+          this.response = {statusCode: 200};
+        });
+        describe("when there is a single title tag", function(){
+          beforeEach(function(){
+            this.title = "The URL";
+            this.body = "<html><head><title>" + this.title + "</title></head></html>";
+          });
+          beforeEach(function(){
+            var that = this;
+            this.stubRequest = sinon.stub(this.env, "request", function(_, f){
+              return f(that.error, that.response, that.body);
+            });
+          });
+          beforeEach(function(){
+            this.res = this.subject.runReader(
+              this.subject.createUrl(this.url, this.key),
+              this.env
+            );
+          });
+          it("should result in an object with a node ID", k(function(res){
+            expect(res.id).to.not.be.empty;
+          }));
+          it("should result in an object with a node URL", k(function(res){
+            expect(res.url).to.equal(this.url);
+          }));
+          it("should result in an object with a node title", k(function(res){
+            expect(res.title).to.equal(this.title);
+          }));
+        });
+        describe("when there is no title tag", function(){
+          beforeEach(function(){
+            this.title = "";
+            this.body = "<html><head></head></html>";
+          });
+          beforeEach(function(){
+            var that = this;
+            this.stubRequest = sinon.stub(this.env, "request", function(_, f){
+              return f(that.error, that.response, that.body);
+            });
+          });
+          beforeEach(function(){
+            this.res = this.subject.runReader(
+              this.subject.createUrl(this.url, this.key),
+              this.env
+            );
+          });
+          it("should result in an object with a node ID", k(function(res){
+            expect(res.id).to.not.be.empty;
+          }));
+          it("should result in an object with a node URL", k(function(res){
+            expect(res.url).to.equal(this.url);
+          }));
+          it("should result in an object with a node title", k(function(res){
+            expect(res.title).to.equal(this.title);
+          }));
+        });
+        describe("when there are multiple title tags", function(){
+          beforeEach(function(){
+            this.titles = ["One", "Two", "", "Three"];
+            this.body = "<html><head>" + this.titles.map(function(a){
+                return "<title>" + a + "</title>";
+            }) + "</head></html>";
+          });
+          beforeEach(function(){
+            var that = this;
+            this.stubRequest = sinon.stub(this.env, "request", function(_, f){
+              return f(that.error, that.response, that.body);
+            });
+          });
+          beforeEach(function(){
+            this.res = this.subject.runReader(
+              this.subject.createUrl(this.url, this.key),
+              this.env
+            );
+          });
+          it("should result in an object with a node ID", k(function(res){
+            expect(res.id).to.not.be.empty;
+          }));
+          it("should result in an object with a node URL", k(function(res){
+            expect(res.url).to.equal(this.url);
+          }));
+          it("should result in an object with a node title", k(function(res){
+            expect(res.title).to.equal(this.titles.join(""));
+          }));
+        });
       });
-      it("should result in an object with a node ID", k(function(res){
-        expect(res.id).to.not.be.empty;
-      }));
-      it("should result in an object with a node URL", k(function(res){
-        expect(res.url).to.equal(this.url);
-      }));
     });
 
     describe("when the url is not created successfully", function(){
       describe("when the user is not found", function(){
         beforeEach(function(){
-          this.stubQuery = sinon.stub(this.db, "query", function(_, _, f){
+          this.stubQuery = sinon.stub(this.env.db, "query", function(_, _, f){
             return f(undefined, []);
           });
         });
         beforeEach(function(){
-          this.res = this.subject.runDB(
+          this.res = this.subject.runReader(
             this.subject.createUrl(this.url, this.key),
-            this.db
+            this.env
           );
         });
         it("should result in a rejected deferred", function(){
-          expect(this.res.isRejected()).to.be.true
+          expect(this.res.state()).to.equal("rejected");
         });
       });
       describe("when the node fails to be saved", function(){
@@ -98,21 +173,32 @@ describe("Oregano", function(){
           sinon.stub(this.node, "save", function(f){
             return f("failed to save");
           });
-          sinon.stub(this.db, "query", function(_, _, f){
+          sinon.stub(this.env.db, "query", function(_, _, f){
             return f(undefined, [{a: node()}]);
           });
-          sinon.stub(this.db, "createNode", function(_){
+          sinon.stub(this.env.db, "createNode", function(_){
             return that.node;
           }); 
         });
         beforeEach(function(){
-          this.res = this.subject.runDB(
+          this.error = false;
+          this.response = {statusCode: 200};
+          this.body = "";
+        });
+        beforeEach(function(){
+          var that = this;
+          this.stubRequest = sinon.stub(this.env, "request", function(_, f){
+            return f(that.error, that.response, that.body);
+          });
+        });
+        beforeEach(function(){
+          this.res = this.subject.runReader(
             this.subject.createUrl(this.url, this.key),
-            this.db
+            this.env
           );
         });
         it("should result in a rejected deferred", function(){
-          expect(this.res.isRejected()).to.be.true
+          expect(this.res.state()).to.equal("rejected");
         });
       });
       describe("when the rel fails to be created", function(){
@@ -122,19 +208,58 @@ describe("Oregano", function(){
           sinon.stub(this.node, "createRelationshipTo", function(_, _, _, f){
             return f("failed to create rel");
           });
-          sinon.stub(this.db, "query", function(_, _, f){
+          sinon.stub(this.env.db, "query", function(_, _, f){
             return f(undefined, [{a: that.node}]);
           });
         });
         beforeEach(function(){
-          this.res = this.subject.runDB(
+          this.error = false;
+          this.response = {statusCode: 200};
+          this.body = "";
+        });
+        beforeEach(function(){
+          var that = this;
+          this.stubRequest = sinon.stub(this.env, "request", function(_, f){
+            return f(that.error, that.response, that.body);
+          });
+        });
+        beforeEach(function(){
+          this.res = this.subject.runReader(
             this.subject.createUrl(this.url, this.key),
-            this.db
+            this.env
           );
         });
         it("should result in a rejected deferred", function(){
-          expect(this.res.isRejected()).to.be.true
+          expect(this.res.state()).to.equal("rejected");
         });
+      });
+    });
+    describe("when the title fails to be fetched", function(){
+      beforeEach(function(){
+        var that = this;
+        this.stubQuery = sinon.stub(this.env.db, "query", function(_, _, f){
+          return f(undefined, [{a: node({id: that.id})}]);
+        });
+      });
+      beforeEach(function(){
+        this.error = true;
+        this.response = {statusCode: 404};
+        this.body = undefined;
+      });
+      beforeEach(function(){
+        var that = this;
+        this.stubRequest = sinon.stub(this.env, "request", function(_, f){
+          return f(that.error, that.response, that.body);
+        });
+      });
+      beforeEach(function(){
+        this.res = this.subject.runReader(
+          this.subject.createUrl(this.url, this.key),
+          this.env
+        );
+      });
+      it("should result in a rejected deferred", function(){
+        expect(this.res.state()).to.equal("rejected");
       });
     });
   });
@@ -143,27 +268,28 @@ describe("Oregano", function(){
     describe("when the urls are fetched successfully", function(){
       beforeEach(function(){
         this.nodes = [
-          node({id: 1, url: "a", relTypes: ["adds","pinches"]}),
-          node({id: 2, url: "a", relTypes: ["adds","views"]}),
-          node({id: 3, url: "a", relTypes: ["adds","views","pinches"]}),
+          node({id: 1, url: "a", title: "b", relTypes: ["adds","pinches"]}),
+          node({id: 2, url: "a", title: "", relTypes: ["adds","views"]}),
+          node({id: 3, url: "a", title: "c", relTypes: ["adds","views","pinches"]}),
         ];
       });
       beforeEach(function(){
         var that = this;
-        sinon.stub(this.db, "query", function(query, _, f){
+        sinon.stub(this.env.db, "query", function(query, _, f){
           return f(undefined, that.nodes.map(function(a){
             return {
               id: a.id,
               url: a.data.url,
+              title: a.data.title,
               relTypes: a.data.relTypes
             };
           }));
         });
       });
       beforeEach(function(){
-        this.res = this.subject.runDB(
+        this.res = this.subject.runReader(
           this.subject.indexUrls(this.key),
-          this.db
+          this.env
         );
       });
       it("should return the adds rels", k(function(res){
@@ -179,6 +305,11 @@ describe("Oregano", function(){
           expect(res[i].url).to.equal(this.nodes[i].data.url);
         }, this);
       }));
+      it("should have a title", k(function(res){
+        res.forEach(function(a, i){
+          expect(res[i].title).to.equal(this.nodes[i].data.title);
+        }, this);
+      }));
       it("should have rel types", k(function(res){
         expect(res[0].relTypes).to.eql(["adds","pinches"]);
         expect(res[1].relTypes).to.eql(["adds","views"]);
@@ -188,16 +319,16 @@ describe("Oregano", function(){
 
     describe("when the url are not fetched successfully", function(){
       beforeEach(function(){
-        sinon.stub(this.db, "query", function(query, _, f){
+        sinon.stub(this.env.db, "query", function(query, _, f){
           return f("failed");
         });
-        this.res = this.subject.runDB(
+        this.res = this.subject.runReader(
           this.subject.indexUrls(this.key),
-          this.db
+          this.env
         );
       });
       it("should be a rejected deferred", function(){
-        expect(this.res.isRejected()).to.be.true
+          expect(this.res.state()).to.equal("rejected");
       });
     });
   });
@@ -208,11 +339,11 @@ describe("Oregano", function(){
       this.id = "a";
       this.user = node({id: "1"});
       this.node = node({id: this.id});
-      sinon.stub(this.db, "query", function(query, _, f){
+      sinon.stub(this.env.db, "query", function(query, _, f){
         return query.match(/r:views/) ?
           f(undefined, that.views) : f(undefined, [{a: that.user}]);
       });
-      sinon.stub(this.db, "getNodeById", function(_, f){
+      sinon.stub(this.env.db, "getNodeById", function(_, f){
         return f(undefined, that.node);
       });
     });
@@ -222,13 +353,13 @@ describe("Oregano", function(){
         sinon.stub(this.user, "createRelationshipTo", function(_, _, _, f){
           return f();
         });
-        this.res = this.subject.runDB(
+        this.res = this.subject.runReader(
           this.subject.createUrlView(this.id, this.key),
-          this.db
+          this.env
         );
       });
       it("should be a resolved deferred", function(){
-        expect(this.res.isResolved()).to.be.true;
+        expect(this.res.state()).to.equal("resolved");
       });
       it("should create a views rel", function(){
         expect(this.user.createRelationshipTo.calledOnce).to.be.true;
@@ -240,13 +371,13 @@ describe("Oregano", function(){
         sinon.stub(this.user, "createRelationshipTo", function(_, _, _, f){
           return f("should not reach this point");
         });
-        this.res = this.subject.runDB(
+        this.res = this.subject.runReader(
           this.subject.createUrlView(this.id, this.key),
-          this.db
+          this.env
         );
       });
       it("should be a resolved deferred", function(){
-        expect(this.res.isResolved()).to.be.true;
+        expect(this.res.state()).to.equal("resolved");
       });
       it("should not create a views rel", function(){
         expect(this.user.createRelationshipTo.notCalled).to.be.true;
@@ -258,13 +389,13 @@ describe("Oregano", function(){
         sinon.stub(this.user, "createRelationshipTo", function(_, _, _, f){
           return f("fail");
         });
-        this.res = this.subject.runDB(
+        this.res = this.subject.runReader(
           this.subject.createUrlView(this.id, this.key),
-          this.db
+          this.env
         );
       });
       it("should be a rejected deferred", function(){
-        expect(this.res.isRejected()).to.be.true;
+        expect(this.res.state()).to.equal("rejected");
       });
     });
   });
@@ -275,11 +406,11 @@ describe("Oregano", function(){
       this.id = "a";
       this.user = node({id: "1"});
       this.node = node({id: this.id});
-      sinon.stub(this.db, "query", function(query, _, f){
+      sinon.stub(this.env.db, "query", function(query, _, f){
         return query.match(/r:pinches/) ?
           f(undefined, that.views) : f(undefined, [{a: that.user}]);
       });
-      sinon.stub(this.db, "getNodeById", function(_, f){
+      sinon.stub(this.env.db, "getNodeById", function(_, f){
         return f(undefined, that.node);
       });
     });
@@ -289,13 +420,13 @@ describe("Oregano", function(){
         sinon.stub(this.user, "createRelationshipTo", function(_, _, _, f){
           return f();
         });
-        this.res = this.subject.runDB(
+        this.res = this.subject.runReader(
           this.subject.createUrlPinch(this.id, this.key),
-          this.db
+          this.env
         );
       });
       it("should be a resolved deferred", function(){
-        expect(this.res.isResolved()).to.be.true;
+        expect(this.res.state()).to.equal("resolved");
       });
       it("should create a pinches rel", function(){
         expect(this.user.createRelationshipTo.calledOnce).to.be.true;
@@ -307,13 +438,13 @@ describe("Oregano", function(){
         sinon.stub(this.user, "createRelationshipTo", function(_, _, _, f){
           return f("should not reach this point");
         });
-        this.res = this.subject.runDB(
+        this.res = this.subject.runReader(
           this.subject.createUrlPinch(this.id, this.key),
-          this.db
+          this.env
         );
       });
       it("should be a resolved deferred", function(){
-        expect(this.res.isResolved()).to.be.true;
+        expect(this.res.state()).to.equal("resolved");
       });
       it("should not create a pinches rel", function(){
         expect(this.user.createRelationshipTo.notCalled).to.be.true;
@@ -325,13 +456,13 @@ describe("Oregano", function(){
         sinon.stub(this.user, "createRelationshipTo", function(_, _, _, f){
           return f("fail");
         });
-        this.res = this.subject.runDB(
+        this.res = this.subject.runReader(
           this.subject.createUrlPinch(this.id, this.key),
-          this.db
+          this.env
         );
       });
       it("should be a rejected deferred", function(){
-        expect(this.res.isRejected()).to.be.true;
+        expect(this.res.state()).to.equal("rejected");
       });
     });
   });

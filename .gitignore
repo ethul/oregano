@@ -1,4 +1,5 @@
 .*swp
+.*un~
 .sass-cache/
 node_modules/
 tmp/

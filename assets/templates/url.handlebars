@@ -1,5 +1,11 @@
 <article id=url-{{id}} class="{{classNames}}">
-  <h1>{{url}}</h1>
+  <h1>
+    {{#if title}}
+      {{title}}
+    {{else}}
+      {{url}}
+    {{/if}}
+  </h1>
   <div class=controls>
     <a href="#urls/{{id}}/view" class=view>
       <i class=icon-external-link></i>
